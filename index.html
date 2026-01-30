@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Odds Breaker: Space Run</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@400;700&display=swap');
+
+        :root {
+            --bg-color: #050b14;
+            --primary: #00e5ff; /* Cyan */
+            --secondary: #7000ff; /* Deep Purple */
+            --danger: #ff3333; /* Red Alert */
+            --gold: #ffcc00;
+            --glass: rgba(255, 255, 255, 0.05);
+            --ui-font: 'Roboto', sans-serif;
+            --header-font: 'Orbitron', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: var(--ui-font);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 600px;
+            background: #020408;
+            box-shadow: 0 0 50px rgba(0, 229, 255, 0.1);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlays */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(5, 11, 20, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 10;
+            transition: opacity 0.3s ease;
+        }
+
+        .hidden {
+            opacity: 0 !important;
+            pointer-events: none !important;
+            z-index: -1 !important;
+        }
+
+        h1 {
+            font-family: var(--header-font);
+            font-size: 2.2rem;
+            text-transform: uppercase;
+            margin: 0 0 20px 0;
+            background: linear-gradient(90deg, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 229, 255, 0.6);
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .balance-display {
+            font-family: var(--header-font);
+            font-size: 1.5rem;
+            color: var(--gold);
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+        }
+
+        .panel {
+            background: linear-gradient(180deg, rgba(30, 40, 60, 0.8), rgba(10, 15, 25, 0.9));
+            border: 1px solid rgba(0, 229, 255, 0.2);
+            border-radius: 12px;
+            padding: 25px;
+            width: 85%;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            position: relative;
+        }
+        
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: 20%; right: 20%;
+            height: 2px;
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        .bet-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0;
+        }
+
+        button {
+            background: rgba(0, 229, 255, 0.1);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 10px 20px;
+            font-family: var(--header-font);
+            font-weight: 700;
+            font-size: 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);
+        }
+
+        button:active {
+            transform: scale(0.95);
+            background: rgba(0, 229, 255, 0.3);
+        }
+
+        button.primary {
+            background: linear-gradient(135deg, var(--secondary), #4a00e0);
+            border: none;
+            color: white;
+            box-shadow: 0 0 20px rgba(112, 0, 255, 0.4);
+            width: 100%;
+            padding: 18px;
+            font-size: 1.2rem;
+            margin-top: 15px;
+            letter-spacing: 2px;
+        }
+
+        button.primary:hover {
+            box-shadow: 0 0 30px rgba(112, 0, 255, 0.7);
+            transform: translateY(-2px);
+        }
+
+        .bet-value {
+            font-size: 2.2rem;
+            font-family: var(--header-font);
+            color: white;
+            min-width: 100px;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 5;
+            transition: opacity 0.3s;
+        }
+
+        .hud-item {
+            background: rgba(0, 0, 0, 0.7);
+            border-left: 3px solid var(--primary);
+            padding: 8px 16px;
+            font-family: var(--header-font);
+            font-size: 0.8rem;
+            color: #ccc;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            clip-path: polygon(0 0, 100% 0, 95% 100%, 0 100%);
+            min-width: 100px;
+        }
+        
+        .hud-item.right {
+            align-items: flex-end;
+            border-left: none;
+            border-right: 3px solid var(--gold);
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 5% 100%);
+        }
+
+        .hud-value {
+            color: white;
+            font-size: 1.2rem;
+            margin-top: 2px;
+        }
+
+        .hud-multiplier {
+            color: var(--gold);
+            font-size: 1.4rem;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            margin-top: 2px;
+        }
+
+        /* Cashout Button */
+        #btn-cashout {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            border: none;
+            color: #000;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-family: var(--header-font);
+            font-size: 1.5rem;
+            font-weight: 900;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+            z-index: 20;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.3s;
+            white-space: nowrap;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1;
+            clip-path: none;
+        }
+
+        #btn-cashout:active {
+            transform: translateX(-50%) scale(0.95);
+        }
+
+        #btn-cashout span {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+            font-weight: 700;
+        }
+
+        /* Results */
+        .win-text { color: var(--primary); text-shadow: 0 0 20px var(--primary); }
+        .lose-text { color: var(--danger); text-shadow: 0 0 20px var(--danger); }
+        
+        .tutorial {
+            font-size: 0.8rem;
+            color: #667;
+            margin-top: 20px;
+            font-family: var(--header-font);
+        }
+
+        /* Floating text animation */
+        .floater {
+            position: absolute;
+            font-family: var(--header-font);
+            font-weight: bold;
+            pointer-events: none;
+            animation: floatUp 1.2s ease-out forwards;
+            text-shadow: 0 0 5px black;
+            z-index: 4;
+            font-size: 1.2rem;
+            white-space: nowrap;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-80px) scale(1.3); opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+        <div class="hud-item">
+            <span>БАЛАНС</span>
+            <span id="hud-balance" class="hud-value">1000</span>
+        </div>
+        <div class="hud-item right">
+            <span>ВЫИГРЫШ</span>
+            <span id="hud-multiplier" class="hud-multiplier">0</span>
+        </div>
+    </div>
+
+    <!-- Cashout Button -->
+    <button id="btn-cashout" class="hidden">
+        <span>ЗАБРАТЬ</span>
+        <div id="cashout-amount">0</div>
+    </button>
+
+    <!-- Menu Screen -->
+    <div id="menu-screen" class="screen">
+        <h1>SPACE<br><span style="font-size: 1.2rem; color: var(--primary); letter-spacing: 8px;">DRIFTER</span></h1>
+        
+        <div class="balance-display">CRD: <span id="menu-balance">1000</span></div>
+
+        <div class="panel">
+            <div style="text-transform: uppercase; color: #889; font-size: 0.7rem; letter-spacing: 1px; margin-bottom:10px;">Ставка на вылет</div>
+            <div class="bet-controls">
+                <button id="btn-dec">-</button>
+                <span class="bet-value" id="bet-amount">100</span>
+                <button id="btn-inc">+</button>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom: 5px;">
+                <button style="font-size:0.7rem; padding: 5px 10px; width:48%;" onclick="setBetPercent(0.5)">1/2</button>
+                <button style="font-size:0.7rem; padding: 5px 10px; width:48%;" onclick="setBetPercent(1)">MAX</button>
+            </div>
+        </div>
+
+        <button class="primary" id="btn-start">ЗАПУСК</button>
+        <p class="tutorial">ЛЕТИ И СОБИРАЙ ГРУЗЫ. 1 ЯЩИК = +10 КРЕДИТОВ. ЗАБЕРИ ПРИБЫЛЬ.</p>
+    </div>
+
+    <!-- Result Screen -->
+    <div id="result-screen" class="screen hidden">
+        <h1 id="result-title">УСПЕХ</h1>
+        <div class="panel">
+            <div id="result-message" style="margin-bottom: 10px; color: #aaa; text-transform: uppercase; font-size: 0.8rem;">Итоговая выплата:</div>
+            <div id="result-value" class="bet-value" style="color: var(--primary)">+250</div>
+            <div style="width: 100%; height: 1px; background: rgba(255,255,255,0.1); margin: 15px 0;"></div>
+            <div id="result-multiplier" style="color:var(--gold); font-family: var(--header-font); font-size: 1.2rem;">Собрано: 5 шт.</div>
+        </div>
+        <button class="primary" id="btn-continue">В АНГАР</button>
+    </div>
+</div>
+
+<script>
+    // --- Constants & Config ---
+    const COLORS = {
+        bg: '#020408',
+        player: '#00e5ff',
+        playerEngine: '#00ff88',
+        asteroid: '#8899aa',
+        asteroidShadow: '#556677',
+        supply: '#ffcc00', // Gold/Yellow crates
+        supplyGlow: 'rgba(255, 204, 0, 0.4)',
+        star: '#ffffff'
+    };
+
+    // --- State ---
+    const state = {
+        balance: 1000,
+        bet: 100,
+        currentProfit: 0, 
+        isPlaying: false,
+        speed: 7, // Initial speed
+        distance: 0,
+        lastSpeedIncreaseTime: 0,
+        gameLoopId: null
+    };
+
+    // --- DOM Elements ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const ui = {
+        menu: document.getElementById('menu-screen'),
+        result: document.getElementById('result-screen'),
+        hud: document.getElementById('hud'),
+        menuBalance: document.getElementById('menu-balance'),
+        hudBalance: document.getElementById('hud-balance'),
+        hudMultiplier: document.getElementById('hud-multiplier'),
+        betAmount: document.getElementById('bet-amount'),
+        resultTitle: document.getElementById('result-title'),
+        resultValue: document.getElementById('result-value'),
+        resultMultiplier: document.getElementById('result-multiplier'),
+        container: document.getElementById('game-container'),
+        btnCashout: document.getElementById('btn-cashout'),
+        cashoutAmount: document.getElementById('cashout-amount')
+    };
+
+    // --- Game Entities ---
+    let player = { x: 0, y: 0, width: 40, height: 50, tilt: 0 };
+    let obstacles = []; // Asteroids
+    let particles = [];
+    let supplies = []; // Loot crates
+    let stars = []; // Background stars
+
+    // --- Setup Canvas ---
+    function resize() {
+        canvas.width = ui.container.clientWidth;
+        canvas.height = ui.container.clientHeight;
+        player.y = canvas.height - 120;
+        player.x = canvas.width / 2;
+        initStars();
+    }
+    window.addEventListener('resize', resize);
+    
+    // --- Starfield ---
+    function initStars() {
+        stars = [];
+        for(let i=0; i<80; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2 + 0.5,
+                speed: Math.random() * 3 + 1
+            });
+        }
+    }
+
+    // --- Input Handling ---
+    let input = { x: 0 };
+
+    function handleInput(clientX) {
+        const rect = canvas.getBoundingClientRect();
+        input.x = clientX - rect.left;
+    }
+
+    canvas.addEventListener('mousemove', e => handleInput(e.clientX));
+    canvas.addEventListener('touchmove', e => {
+        e.preventDefault(); 
+        handleInput(e.touches[0].clientX);
+    }, {passive: false});
+
+    // --- Game Logic ---
+
+    function initGame() {
+        if (state.balance < state.bet) {
+            ui.menuBalance.style.color = '#ff3333';
+            setTimeout(() => ui.menuBalance.style.color = COLORS.gold, 500);
+            if (state.balance > 0) {
+                state.bet = state.balance;
+                updateUI();
+            } else {
+                return;
+            }
+        }
+
+        // Deduct bet
+        state.balance -= state.bet;
+        state.currentProfit = 0; // Reset profit
+        state.distance = 0;
+        state.speed = 7; // Reset speed
+        state.lastSpeedIncreaseTime = Date.now(); // Reset timer
+        state.isPlaying = true;
+
+        player.x = canvas.width / 2;
+        obstacles = [];
+        supplies = [];
+        particles = [];
+
+        // UI toggles
+        ui.menu.classList.add('hidden');
+        ui.result.classList.add('hidden');
+        ui.hud.classList.remove('hidden');
+        ui.btnCashout.classList.remove('hidden');
+        
+        updateUI();
+        gameLoop();
+    }
+
+    function gameOver(win) {
+        state.isPlaying = false;
+        cancelAnimationFrame(state.gameLoopId);
+
+        ui.hud.classList.add('hidden');
+        ui.btnCashout.classList.add('hidden');
+        ui.result.classList.remove('hidden');
+
+        if (win) {
+            const winnings = state.bet + state.currentProfit;
+            state.balance += winnings;
+            
+            ui.resultTitle.innerText = "ВЫИГРЫШ";
+            ui.resultTitle.className = "win-text";
+            ui.resultValue.innerText = "+" + winnings + " CRD";
+            // Display net profit or box count
+            const boxes = state.currentProfit / 10;
+            ui.resultMultiplier.innerText = "Собрано: " + boxes + " шт.";
+            spawnExplosion(canvas.width/2, canvas.height/2, COLORS.gold, 50); 
+        } else {
+            ui.resultTitle.innerText = "КРУШЕНИЕ";
+            ui.resultTitle.className = "lose-text";
+            ui.resultValue.innerText = "-" + state.bet + " CRD";
+            ui.resultMultiplier.innerText = "Надо было забирать раньше...";
+        }
+        
+        updateUI();
+    }
+
+    // --- Spawning System ---
+    function spawnAsteroid() {
+        const radius = Math.random() * 20 + 15; // 15-35px radius
+        const x = Math.random() * (canvas.width - radius*2) + radius;
+        
+        const points = [];
+        const segments = 8;
+        for (let i = 0; i < segments; i++) {
+            const angle = (i / segments) * Math.PI * 2;
+            const r = radius * (0.8 + Math.random() * 0.4);
+            points.push({
+                x: Math.cos(angle) * r,
+                y: Math.sin(angle) * r
+            });
+        }
+
+        obstacles.push({
+            x: x,
+            y: -50,
+            radius: radius, 
+            points: points,
+            rotation: Math.random() * Math.PI * 2,
+            rotSpeed: (Math.random() - 0.5) * 0.1
+        });
+    }
+
+    function spawnSupply() {
+        // Fixed value, no random logic needed
+        supplies.push({
+            x: Math.random() * (canvas.width - 40) + 20,
+            y: -50,
+            width: 25,
+            height: 25,
+            value: 10, // FIXED 10 CREDITS
+            rotation: 0
+        });
+    }
+
+    function spawnExplosion(x, y, color, count = 15) {
+        for (let i = 0; i < count; i++) {
+            particles.push({
+                x: x,
+                y: y,
+                vx: (Math.random() - 0.5) * 15,
+                vy: (Math.random() - 0.5) * 15,
+                life: 1.0,
+                color: color,
+                size: Math.random() * 3 + 1
+            });
+        }
+    }
+
+    function showFloatingText(text, x, y, color) {
+        const el = document.createElement('div');
+        el.className = 'floater';
+        el.innerText = text;
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        el.style.color = color;
+        ui.container.appendChild(el);
+        setTimeout(() => el.remove(), 1200);
+    }
+
+    // --- Drawing Functions ---
+    
+    function drawSpaceship(ctx, x, y, tilt) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(tilt * 0.5); 
+        
+        const scale = 1.3; 
+        ctx.scale(scale, scale);
+
+        // Engine Flames (Twin engines)
+        const flicker = Math.random() * 0.4 + 0.6;
+        ctx.fillStyle = `rgba(0, 255, 136, ${flicker})`;
+        ctx.beginPath();
+        ctx.moveTo(-6, 20);
+        ctx.lineTo(-6, 35 + Math.random()*10);
+        ctx.lineTo(-2, 20);
+        ctx.moveTo(6, 20);
+        ctx.lineTo(6, 35 + Math.random()*10);
+        ctx.lineTo(2, 20);
+        ctx.fill();
+
+        // Shadow/Glow
+        ctx.shadowColor = COLORS.player;
+        ctx.shadowBlur = 15;
+
+        // Main Fuselage
+        ctx.fillStyle = '#00b8cc'; 
+        ctx.beginPath();
+        ctx.moveTo(0, -25);
+        ctx.lineTo(4, -10);
+        ctx.lineTo(5, 15);
+        ctx.lineTo(0, 20);
+        ctx.lineTo(-5, 15);
+        ctx.lineTo(-4, -10);
+        ctx.closePath();
+        ctx.fill();
+
+        // Wings
+        ctx.fillStyle = COLORS.player;
+        ctx.beginPath();
+        ctx.moveTo(5, -5);
+        ctx.lineTo(22, 12);
+        ctx.lineTo(22, 18);
+        ctx.lineTo(5, 12);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(-5, -5);
+        ctx.lineTo(-22, 12);
+        ctx.lineTo(-22, 18);
+        ctx.lineTo(-5, 12);
+        ctx.closePath();
+        ctx.fill();
+
+        // Rear Stabilizers
+        ctx.fillStyle = '#0099aa';
+        ctx.beginPath();
+        ctx.moveTo(3, 15);
+        ctx.lineTo(10, 22);
+        ctx.lineTo(3, 22);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-3, 15);
+        ctx.lineTo(-10, 22);
+        ctx.lineTo(-3, 22);
+        ctx.fill();
+        
+        // Cockpit
+        ctx.shadowBlur = 5;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(0, -5, 3, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Detail Lines
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, -25);
+        ctx.lineTo(0, 20);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    function drawAsteroid(ctx, obj) {
+        ctx.save();
+        ctx.translate(obj.x, obj.y);
+        ctx.rotate(obj.rotation);
+        
+        ctx.fillStyle = COLORS.asteroid;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        const pts = obj.points;
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for(let i=1; i<pts.length; i++) {
+            ctx.lineTo(pts[i].x, pts[i].y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.fillStyle = COLORS.asteroidShadow;
+        ctx.beginPath();
+        ctx.arc(-obj.radius/3, -obj.radius/3, obj.radius/4, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    function drawSupply(ctx, obj) {
+        ctx.save();
+        ctx.translate(obj.x, obj.y);
+        ctx.rotate(obj.rotation);
+        
+        ctx.shadowColor = COLORS.supply;
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = COLORS.supply;
+        
+        ctx.fillRect(-obj.width/2, -obj.height/2, obj.width, obj.height);
+        
+        ctx.fillStyle = '#000';
+        ctx.shadowBlur = 0;
+        ctx.fillRect(-2, -8, 4, 16);
+        ctx.fillRect(-8, -2, 16, 4);
+
+        ctx.restore();
+    }
+
+    // --- Main Loop ---
+    function gameLoop() {
+        if (!state.isPlaying) return;
+
+        // 1. Clear & Background
+        ctx.fillStyle = COLORS.bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 2. Stars (Parallax)
+        ctx.fillStyle = COLORS.star;
+        stars.forEach(star => {
+            star.y += star.speed * (state.speed / 5);
+            if (star.y > canvas.height) {
+                star.y = 0;
+                star.x = Math.random() * canvas.width;
+            }
+            ctx.globalAlpha = Math.random() * 0.5 + 0.3;
+            ctx.fillRect(star.x, star.y, star.size, star.size);
+        });
+        ctx.globalAlpha = 1;
+
+        // 3. Game Logic Update (SPEED & DIFFICULTY)
+        state.distance += state.speed;
+        
+        // Every 20 seconds speed up
+        if (Date.now() - state.lastSpeedIncreaseTime > 20000) {
+            const increasePct = 0.02 + Math.random() * 0.03; // 2% to 5%
+            state.speed *= (1 + increasePct);
+            state.lastSpeedIncreaseTime = Date.now();
+            
+            const pctDisplay = Math.round(increasePct * 100);
+            showFloatingText("СКОРОСТЬ +" + pctDisplay + "%!", player.x, player.y - 100, COLORS.danger);
+            spawnExplosion(player.x, player.y + 40, COLORS.playerEngine, 10);
+        }
+
+        // Spawning Logic
+        // Difficulty scales with speed to ensure density stays challenging
+        // As speed increases, we spawn more often to fill the screen
+        const difficulty = state.speed / 6; 
+        
+        if (Math.random() < 0.02 * difficulty) spawnAsteroid();
+        if (Math.random() < 0.012) spawnSupply(); // Slightly increased spawn rate for supplies
+
+        // Player Movement
+        const targetX = input.x;
+        const dx = targetX - player.x;
+        player.x += dx * 0.15; 
+        player.tilt = Math.max(Math.min(dx * 0.05, 1), -1); 
+        
+        // Clamp
+        if (player.x < 20) player.x = 20;
+        if (player.x > canvas.width - 20) player.x = canvas.width - 20;
+
+        // 4. Draw Player
+        drawSpaceship(ctx, player.x, player.y, player.tilt);
+
+        // 5. Obstacles (Asteroids)
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            let o = obstacles[i];
+            
+            // Movement logic linked directly to speed
+            o.y += state.speed; 
+            o.rotation += o.rotSpeed;
+
+            // Collision
+            const distX = player.x - o.x;
+            const distY = player.y - o.y;
+            const dist = Math.sqrt(distX*distX + distY*distY);
+            
+            if (dist < (o.radius + 20)) { 
+                spawnExplosion(player.x, player.y, COLORS.danger, 30);
+                spawnExplosion(o.x, o.y, COLORS.asteroid, 10);
+                gameOver(false); // CRASH!
+                return;
+            }
+
+            drawAsteroid(ctx, o);
+
+            if (o.y > canvas.height + 50) obstacles.splice(i, 1);
+        }
+
+        // 6. Supplies
+        for (let i = supplies.length - 1; i >= 0; i--) {
+            let s = supplies[i];
+            s.y += state.speed; // Also move faster
+            s.rotation = Math.sin(Date.now() / 200) * 0.2;
+
+            if (s.y + s.height/2 > player.y - 25 && 
+                s.y - s.height/2 < player.y + 25 &&
+                Math.abs(player.x - s.x) < 40) {
+                
+                // ADD FIXED 10 CREDITS
+                state.currentProfit += 10;
+                spawnExplosion(s.x, s.y, COLORS.supply, 10);
+                showFloatingText("+10 CRD", s.x, s.y, COLORS.supply);
+                supplies.splice(i, 1);
+                updateUI();
+                continue;
+            }
+
+            drawSupply(ctx, s);
+            if (s.y > canvas.height + 50) supplies.splice(i, 1);
+        }
+
+        // 7. Particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life -= 0.04;
+            
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size || 2, 0, Math.PI*2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        // 8. UI Updates - SYNCHRONIZED
+        const currentWin = state.bet + state.currentProfit;
+        ui.cashoutAmount.innerText = currentWin;
+        // Display SAME total value in HUD
+        ui.hudMultiplier.innerText = currentWin;
+
+        state.gameLoopId = requestAnimationFrame(gameLoop);
+    }
+
+    // --- UI Logic ---
+    function updateUI() {
+        ui.menuBalance.innerText = state.balance;
+        ui.hudBalance.innerText = state.balance;
+        ui.betAmount.innerText = state.bet;
+    }
+
+    function setBetPercent(pct) {
+        state.bet = Math.floor(state.balance * pct);
+        if (state.bet < 10) state.bet = 10;
+        if (state.balance < 10) state.bet = state.balance;
+        updateUI();
+    }
+
+    document.getElementById('btn-dec').addEventListener('click', () => {
+        if (state.bet > 10) state.bet -= 10;
+        updateUI();
+    });
+
+    document.getElementById('btn-inc').addEventListener('click', () => {
+        if (state.bet + 10 <= state.balance) state.bet += 10;
+        updateUI();
+    });
+
+    document.getElementById('btn-start').addEventListener('click', () => {
+        initGame();
+    });
+
+    document.getElementById('btn-continue').addEventListener('click', () => {
+        ui.result.classList.add('hidden');
+        ui.menu.classList.remove('hidden');
+        updateUI();
+    });
+    
+    document.getElementById('btn-cashout').addEventListener('click', (e) => {
+        e.stopPropagation(); 
+        if(state.isPlaying) {
+            gameOver(true); 
+        }
+    });
+
+    // Init
+    resize();
+    initStars(); 
+    
+    function menuLoop() {
+        if (!state.isPlaying) {
+            ctx.fillStyle = COLORS.bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = COLORS.star;
+            stars.forEach(star => {
+                star.y += star.speed * 0.2;
+                if (star.y > canvas.height) { star.y = 0; star.x = Math.random() * canvas.width; }
+                ctx.globalAlpha = Math.random() * 0.5 + 0.1;
+                ctx.fillRect(star.x, star.y, star.size, star.size);
+            });
+            requestAnimationFrame(menuLoop);
+        }
+    }
+    menuLoop();
+    input.x = window.innerWidth / 2;
+
+</script>
+</body>
+</html>
